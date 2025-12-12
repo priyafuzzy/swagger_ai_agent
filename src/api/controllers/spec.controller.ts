@@ -1,41 +1,11 @@
 import { Request, Response, NextFunction } from 'express';
 import { specRepository } from '../../infrastructure/persistence';
-import crypto from 'crypto';
+import { ingestSwagger } from '../../application/spec/ingestSwagger.usecase';
 import { NormalizedSpec } from '../../domain/models/NormalizedSpec';
-import { normalizeSpec } from '../../application/spec/normalizeSpec2.usecase';
-import http from 'http';
-import https from 'https';
-
-async function fetchJsonFromUrl(url: string): Promise<any> {
-  return new Promise((resolve, reject) => {
-    try {
-      const client = url.startsWith('https') ? https : http;
-      const req = client.get(url, (res) => {
-        const { statusCode } = res;
-        if (statusCode && statusCode >= 400) {
-          reject(new Error(`Request failed with status ${statusCode}`));
-          res.resume();
-          return;
-        }
-        let raw = '';
-        res.setEncoding('utf8');
-        res.on('data', (chunk) => raw += chunk);
-        res.on('end', () => {
-          try {
-            const parsed = JSON.parse(raw);
-            resolve(parsed);
-          } catch (err) {
-            // if not JSON, return raw
-            resolve(raw);
-          }
-        });
-      });
-      req.on('error', (err) => reject(err));
-    } catch (err) {
-      reject(err);
-    }
-  });
-}
+import { getSpecById } from '../../application/spec/getSpec.usecase';
+import { listOperationsForSpec } from '../../application/spec/listOperations.usecase';
+import { listTagsForSpec } from '../../application/spec/listTags.usecase';
+import { validateSpec } from '../../application/spec/validateSpec.usecase';
 
 export async function importSpec(req: Request, res: Response, next: NextFunction) {
   try {
@@ -44,37 +14,8 @@ export async function importSpec(req: Request, res: Response, next: NextFunction
     const source = req.body?.source || null;
     if (!raw) raw = req.body || {};
 
-    // If a URL source is provided, fetch it
-    if (source && source.type === 'url' && source.url) {
-      try {
-        const fetched = await fetchJsonFromUrl(source.url);
-        if (fetched) raw = fetched;
-      } catch (err) {
-        // propagate fetch error
-        return next(err);
-      }
-    }
-    const id = `spec-${(crypto as any).randomUUID ? (crypto as any).randomUUID() : Date.now().toString(36)}`;
-
-    let spec: NormalizedSpec;
-    if (raw && typeof raw === 'object' && Object.keys(raw).length > 0) {
-      // Use the normalization use-case to produce a NormalizedSpec
-      spec = await normalizeSpec(raw, { id });
-    } else {
-      // Fallback stub for empty input
-      spec = {
-        id,
-        title: `imported-${id}`,
-        version: '0.0.1',
-        servers: [],
-        tags: [],
-        operationCount: 0,
-        operations: [],
-        raw: { source: raw },
-      } as NormalizedSpec;
-    }
-
-    await specRepository.save(spec as any);
+    // Delegate to the ingest use-case which handles URL fetching, normalization and persistence
+    const spec: NormalizedSpec = await ingestSwagger({ source, raw });
 
     res.json({ specId: spec.id, title: spec.title, version: spec.version, operationCount: spec.operationCount });
   } catch (err) {
@@ -91,4 +32,44 @@ export async function listSpecs(req: Request, res: Response, next: NextFunction)
   }
 }
 
-export default { importSpec, listSpecs };
+export async function getSpec(req: Request, res: Response, next: NextFunction) {
+  try {
+    const specId = req.params.specId;
+    const spec = await getSpecById(specId);
+    res.json(spec);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getOperations(req: Request, res: Response, next: NextFunction) {
+  try {
+    const specId = req.params.specId;
+    const ops = await listOperationsForSpec(specId);
+    res.json({ count: ops.length, operations: ops });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function getTags(req: Request, res: Response, next: NextFunction) {
+  try {
+    const specId = req.params.specId;
+    const tags = await listTagsForSpec(specId);
+    res.json({ count: tags.length, tags });
+  } catch (err) {
+    next(err);
+  }
+}
+
+export async function postValidateSpec(req: Request, res: Response, next: NextFunction) {
+  try {
+    const specId = req.params.specId;
+    const result = await validateSpec(specId);
+    res.json(result);
+  } catch (err) {
+    next(err);
+  }
+}
+
+export default { importSpec, listSpecs, getSpec, getOperations, getTags, postValidateSpec };

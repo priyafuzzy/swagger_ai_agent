@@ -4,6 +4,7 @@ import { requestLogger } from './middlewares/requestLogger';
 import { errorHandler } from './middlewares/errorHandler';
 import specRoutes from '../../src/api/routes/spec.routes';
 import environmentRoutes from '../../src/api/routes/environment.routes';
+import executionRoutes from '../../src/api/routes/execution.routes';
 
 const app = express();
 
@@ -17,6 +18,8 @@ app.get('/health', (req, res) => res.json({ status: 'ok' }));
 app.use('/api/spec', specRoutes);
 // Mount environment API
 app.use('/api/environment', environmentRoutes);
+// Mount execution API
+app.use('/api/execution', executionRoutes);
 
 app.use(errorHandler);
 

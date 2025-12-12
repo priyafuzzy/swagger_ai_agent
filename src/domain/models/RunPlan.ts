@@ -15,6 +15,7 @@ export interface RunPlan {
   envName: string;
   operations: Operation[];
   testCases: TestCaseDefinition[];
+  warnings?: string[];
   createdAt: string;
 }
 
