@@ -31,8 +31,11 @@ export async function generateTestsHandler(req: Request, res: Response, next: Ne
   try {
     const { specId } = req.body;
     if (!specId) return res.status(400).json({ error: 'specId is required' });
-    const tests = await generateTestsForSpec(specId);
-    res.json({ specId, testCount: tests.length, testCases: tests });
+    const result: any = await generateTestsForSpec(specId);
+    const tests = Array.isArray(result) ? result : result.tests;
+    const payload: any = { specId, testCount: (tests || []).length, testCases: tests };
+    if (result && result.warnings) payload.warnings = result.warnings;
+    res.json(payload);
   } catch (err) {
     next(err);
   }

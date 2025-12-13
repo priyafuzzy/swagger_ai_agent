@@ -9,19 +9,21 @@ const persistence_1 = require("../../infrastructure/persistence");
 const generateTests_usecase_1 = require("./generateTests.usecase");
 async function planRun(input) {
     const { specId, envName, selection, useMCP } = input;
+    if (!specId)
+        throw new Error('specId is required');
     const spec = await persistence_1.specRepository.getById(specId);
     if (!spec)
         throw new Error(`Spec not found: ${specId}`);
     const envs = await persistence_1.environmentRepository.listBySpec(specId);
-    const env = envs.find((e) => e.name === envName);
+    const env = envs.find((e) => (envName ? e.name === envName : e.active)) || envs[0];
     if (!env)
-        throw new Error(`Environment not found: ${envName} for spec ${specId}`);
+        throw new Error(`Environment not found for spec ${specId}`);
     // select operations
     let ops = spec.operations || [];
-    if (selection.mode === 'tag' && Array.isArray(selection.tags)) {
+    if (selection && selection.mode === 'tag' && Array.isArray(selection.tags)) {
         ops = ops.filter((o) => (o.tags || []).some((t) => selection.tags.includes(t)));
     }
-    else if (selection.mode === 'operation' && Array.isArray(selection.operationIds)) {
+    else if (selection && selection.mode === 'operation' && Array.isArray(selection.operationIds)) {
         ops = ops.filter((o) => selection.operationIds.includes(o.operationId));
     }
     // Optionally generate richer tests via MCP/LLM
@@ -38,7 +40,6 @@ async function planRun(input) {
                 warnings = result.warnings;
             }
             else {
-                // fallback
                 testCases = (ops || []).map((op, idx) => ({
                     id: `tc-${idx}-${op.operationId}`,
                     name: `Test ${op.operationId}`,
@@ -49,7 +50,6 @@ async function planRun(input) {
             }
         }
         catch (e) {
-            // fallback to deterministic generation
             testCases = (ops || []).map((op, idx) => ({
                 id: `tc-${idx}-${op.operationId}`,
                 name: `Test ${op.operationId}`,
@@ -60,7 +60,6 @@ async function planRun(input) {
         }
     }
     else {
-        // Build simple TestCaseDefinition stubs per operation
         testCases = (ops || []).map((op, idx) => ({
             id: `tc-${idx}-${op.operationId}`,
             name: `Test ${op.operationId}`,
@@ -73,7 +72,7 @@ async function planRun(input) {
     const plan = {
         runId,
         specId,
-        envName,
+        envName: env.name,
         operations: ops,
         testCases,
         createdAt: new Date().toISOString(),

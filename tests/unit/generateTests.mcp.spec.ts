@@ -19,7 +19,8 @@ describe('generateTestsForSpec with MCP', () => {
     } as any;
 
     const mod = await import('../../src/application/execution/generateTests.usecase');
-    const tests = await mod.generateTestsForSpec('spec-x', { useMCP: true, mcpClient: fakeClient });
+    const result: any = await mod.generateTestsForSpec('spec-x', { useMCP: true, mcpClient: fakeClient });
+    const tests = Array.isArray(result) ? result : result.tests;
     expect(Array.isArray(tests)).toBe(true);
     expect(tests[0].id).toBe('tc1');
     expect(tests[0].operationId).toBe('op1');

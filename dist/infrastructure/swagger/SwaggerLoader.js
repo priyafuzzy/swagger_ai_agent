@@ -4,6 +4,9 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 };
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.fetchJsonFromUrl = fetchJsonFromUrl;
+exports.loadFromFile = loadFromFile;
+exports.loadFromGit = loadFromGit;
+const fs_1 = __importDefault(require("fs"));
 const http_1 = __importDefault(require("http"));
 const https_1 = __importDefault(require("https"));
 const js_yaml_1 = __importDefault(require("js-yaml"));
@@ -73,4 +76,19 @@ async function fetchJsonFromUrl(url, maxRedirects = 5) {
         }
     });
 }
-exports.default = { fetchJsonFromUrl };
+async function loadFromFile(path) {
+    const raw = fs_1.default.readFileSync(path, 'utf8');
+    try {
+        return JSON.parse(raw);
+    }
+    catch (e) {
+        // try yaml
+        return js_yaml_1.default.load(raw);
+    }
+}
+async function loadFromGit(opts) {
+    // Stub: implement git clone and read file in the future.
+    // For now, throw a not-implemented error to surface to callers.
+    throw new Error('loadFromGit not implemented');
+}
+exports.default = { fetchJsonFromUrl, loadFromFile, loadFromGit };

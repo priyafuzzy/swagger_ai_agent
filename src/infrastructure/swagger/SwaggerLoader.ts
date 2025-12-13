@@ -1,3 +1,4 @@
+import fs from 'fs';
 import http from 'http';
 import https from 'https';
 import yaml from 'js-yaml';
@@ -73,4 +74,20 @@ export async function fetchJsonFromUrl(url: string, maxRedirects = 5): Promise<a
   });
 }
 
-export default { fetchJsonFromUrl };
+export async function loadFromFile(path: string): Promise<any> {
+  const raw = fs.readFileSync(path, 'utf8');
+  try {
+    return JSON.parse(raw);
+  } catch (e) {
+    // try yaml
+    return yaml.load(raw);
+  }
+}
+
+export async function loadFromGit(opts: { repo: string; ref?: string; filePath: string }): Promise<any> {
+  // Stub: implement git clone and read file in the future.
+  // For now, throw a not-implemented error to surface to callers.
+  throw new Error('loadFromGit not implemented');
+}
+
+export default { fetchJsonFromUrl, loadFromFile, loadFromGit };

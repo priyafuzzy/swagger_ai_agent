@@ -9,20 +9,21 @@ type Selection = {
   operationIds?: string[];
 };
 
-export async function planRun(input: { specId: string; envName: string; selection: Selection; useMCP?: boolean }): Promise<RunPlan> {
+export async function planRun(input: { specId: string; envName?: string; selection?: Selection; useMCP?: boolean }): Promise<RunPlan> {
   const { specId, envName, selection, useMCP } = input as any;
+  if (!specId) throw new Error('specId is required');
   const spec = await specRepository.getById(specId);
   if (!spec) throw new Error(`Spec not found: ${specId}`);
 
   const envs = await environmentRepository.listBySpec(specId as any);
-  const env = envs.find((e: any) => e.name === envName);
-  if (!env) throw new Error(`Environment not found: ${envName} for spec ${specId}`);
+  const env = envs.find((e: any) => (envName ? e.name === envName : e.active)) || envs[0];
+  if (!env) throw new Error(`Environment not found for spec ${specId}`);
 
   // select operations
   let ops = spec.operations || [];
-  if (selection.mode === 'tag' && Array.isArray(selection.tags)) {
+  if (selection && selection.mode === 'tag' && Array.isArray(selection.tags)) {
     ops = ops.filter((o: any) => (o.tags || []).some((t: string) => selection.tags!.includes(t)));
-  } else if (selection.mode === 'operation' && Array.isArray(selection.operationIds)) {
+  } else if (selection && selection.mode === 'operation' && Array.isArray(selection.operationIds)) {
     ops = ops.filter((o: any) => selection.operationIds!.includes(o.operationId));
   }
 
@@ -38,7 +39,6 @@ export async function planRun(input: { specId: string; envName: string; selectio
         testCases = result.tests;
         warnings = result.warnings;
       } else {
-        // fallback
         testCases = (ops || []).map((op: any, idx: number) => ({
           id: `tc-${idx}-${op.operationId}`,
           name: `Test ${op.operationId}`,
@@ -48,7 +48,6 @@ export async function planRun(input: { specId: string; envName: string; selectio
         }));
       }
     } catch (e) {
-      // fallback to deterministic generation
       testCases = (ops || []).map((op: any, idx: number) => ({
         id: `tc-${idx}-${op.operationId}`,
         name: `Test ${op.operationId}`,
@@ -58,7 +57,6 @@ export async function planRun(input: { specId: string; envName: string; selectio
       }));
     }
   } else {
-    // Build simple TestCaseDefinition stubs per operation
     testCases = (ops || []).map((op: any, idx: number) => ({
       id: `tc-${idx}-${op.operationId}`,
       name: `Test ${op.operationId}`,
@@ -73,7 +71,7 @@ export async function planRun(input: { specId: string; envName: string; selectio
   const plan: RunPlan = {
     runId,
     specId,
-    envName,
+    envName: env.name,
     operations: ops,
     testCases,
     createdAt: new Date().toISOString(),

@@ -4,6 +4,7 @@ import { TestCaseDefinition } from '../../domain/models/RunPlan';
 import { specRepository } from '../../infrastructure/persistence';
 import { getCompatibilityClient } from '../../infrastructure/mcp/FactoryAdapter';
 import Ajv from 'ajv';
+import logger from '../../infrastructure/logging/Logger';
 import { testCasesArraySchema } from './llmSchema';
 import { examplePayloadForOperation } from './payloadTemplates';
 
@@ -54,7 +55,7 @@ export async function generateTestsForSpec(specId: string, opts: GenerateTestsOp
   const useMCP = opts.useMCP || process.env.GENERATE_WITH_MCP === 'true';
   if (useMCP) {
     const client = opts.mcpClient || getCompatibilityClient('generator');
-      try {
+    try {
       await client.connect();
       const prompt = `You are an assistant that outputs a JSON array of test case objects. For each operation provide an object with keys: operationId, id (optional), name, expectedStatus (number), payloadStrategy(one of example|schema|llm|none). Input operations: ${JSON.stringify(
         ops.map((o) => ({ path: o.path, method: o.method, operationId: o.operationId }))
@@ -62,15 +63,16 @@ export async function generateTestsForSpec(specId: string, opts: GenerateTestsOp
       const resp = await client.executeTool('text_generation', { prompt });
       const text = (resp.data && typeof resp.data === 'string') ? resp.data : JSON.stringify(resp.data || resp);
       let parsed: any;
+      try {
         parsed = JSON.parse(text);
       } catch (e) {
         // invalid JSON — fallback
-        parsed = null;
         const warn = `LLM returned invalid JSON; falling back to deterministic generation`;
-        // return fallback below with warning
+        logger.warn(`[generateTestsForSpec] ${warn}`);
         const fallback = generateTestsForOperations(ops);
         return { tests: fallback, warnings: [warn] };
       }
+
       if (Array.isArray(parsed) && parsed.length > 0) {
         // Cross-validate operationId against known operations in the spec
         const knownOps = new Set(ops.map((o) => o.operationId));
@@ -81,6 +83,8 @@ export async function generateTestsForSpec(specId: string, opts: GenerateTestsOp
         if (filtered.length === 0) {
           // no valid operationIds returned by LLM — treat as failure and fall back
           const warn = `LLM returned no operationIds that match the spec; falling back to deterministic generation`;
+          if (rejected.length) logger.warn(`[generateTestsForSpec] ${warn} Rejected operationIds: ${Array.from(new Set(rejected)).join(',')}`);
+          else logger.warn(`[generateTestsForSpec] ${warn}`);
           const fallback = generateTestsForOperations(ops);
           return { tests: fallback, warnings: rejected.length ? [warn, `Rejected operationIds: ${Array.from(new Set(rejected)).join(',')}`] : [warn] };
         } else {
@@ -97,12 +101,18 @@ export async function generateTestsForSpec(specId: string, opts: GenerateTestsOp
             }));
             const warnings: string[] = [];
             if (rejected.length) warnings.push(`Filtered out unknown operationIds: ${Array.from(new Set(rejected)).join(',')}`);
+            if (warnings.length) logger.warn(`[generateTestsForSpec] ${warnings.join('; ')}`);
             return { tests, warnings: warnings.length ? warnings : undefined };
           }
         }
       }
     } catch (e) {
-      // fall back to deterministic generator below
+      const errMsg = `Error during MCP generation: ${(e && (e as any).message) || e}`;
+      logger.error(`[generateTestsForSpec] ${errMsg}`);
+      const warn = `${errMsg}; falling back to deterministic generation`;
+      logger.warn(`[generateTestsForSpec] ${warn}`);
+      const fallback = generateTestsForOperations(ops);
+      return { tests: fallback, warnings: [warn] };
     }
   }
 

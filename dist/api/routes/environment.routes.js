@@ -5,13 +5,14 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
 Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const environment_controller_1 = __importDefault(require("../controllers/environment.controller"));
+const environment_validator_1 = require("../validators/environment.validator");
 const router = (0, express_1.Router)();
 // POST /api/environment -> create a new environment for a spec
-router.post('/', environment_controller_1.default.createEnvironment);
+router.post('/', environment_validator_1.validateCreateEnvironment, environment_controller_1.default.createEnvironment);
 // GET /api/environment/:envId -> get environment details
-router.get('/:envId', environment_controller_1.default.getEnvironment);
+router.get('/:envId', environment_validator_1.validateEnvIdParamMiddleware, environment_controller_1.default.getEnvironment);
 // PUT /api/environment/:envId -> update environment
-router.put('/:envId', environment_controller_1.default.updateEnvironment);
+router.put('/:envId', environment_validator_1.validateEnvIdParamMiddleware, environment_controller_1.default.updateEnvironment);
 // DELETE /api/environment/:envId -> delete environment
-router.delete('/:envId', environment_controller_1.default.deleteEnvironment);
+router.delete('/:envId', environment_validator_1.validateEnvIdParamMiddleware, environment_controller_1.default.deleteEnvironment);
 exports.default = router;
