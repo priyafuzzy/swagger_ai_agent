@@ -1,6 +1,6 @@
 import MCPAdapter from '../../domain/adapters/MCPAdapter';
 import { MockMCPAdapter } from './MockMCPAdapter';
-import SwaggerLoader from '../swagger/SwaggerLoader';
+import * as SwaggerLoader from '../swagger/SwaggerLoader';
 import { specRepository } from '../persistence';
 import OpenApiNormalizer from '../swagger/OpenApiNormalizer';
 import SwaggerValidator from '../swagger/validator';

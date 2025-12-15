@@ -8,6 +8,7 @@ import executionRoutes from '../../src/api/routes/execution.routes';
 import testgenRoutes from '../../src/api/routes/testgen.routes';
 import mcpRoutes from '../../src/api/routes/mcp.routes';
 import mcpSwaggerRoutes from '../../src/api/routes/mcp.swagger.routes';
+import llmRoutes from '../../src/api/routes/llm.routes';
 
 const app = express();
 
@@ -29,6 +30,9 @@ app.use('/api/testgen', testgenRoutes);
 app.use('/api/mcp', mcpRoutes);
 // Mount MCP Swagger helpers
 app.use('/api/mcp/swagger', mcpSwaggerRoutes);
+
+// Mount LLM API
+app.use('/api/llm', llmRoutes);
 
 app.use(errorHandler);
 
