@@ -33,6 +33,10 @@ export class PayloadBuilderLlmClient {
         await client.connect();
         const prompt = this.makePrompt(schema, hints);
         const resp = await client.executeTool('text_generation', { prompt });
+        // compatibility: client may return McpToolResult with success flag
+        if ((resp as any).success === false) {
+          logger.warn('[PayloadBuilderLlmClient] LLM tool returned failure: ' + JSON.stringify((resp as any).error || resp));
+        }
         const raw = resp && (resp.data ?? resp) as any;
         const text = typeof raw === 'string' ? raw : (raw && raw.text) || JSON.stringify(raw);
         try {

@@ -32,11 +32,7 @@ const axios = require('axios');
       console.log('No specId found; skipping environment creation.');
     }
   } catch (err) {
-    if (err.response) {
-      console.error('ERROR_RESPONSE:', err.response.status, err.response.data);
-    } else {
-      console.error('ERROR:', err.message);
-    }
+      console.error('ERROR_FULL:', err && err.stack ? err.stack : err);
     process.exit(1);
   }
 })();

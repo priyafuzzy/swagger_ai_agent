@@ -15,7 +15,20 @@ export async function ingestSwagger(input: IngestInput): Promise<NormalizedSpec>
   const source = input.source || null;
 
   if (!raw && source && source.type === 'url' && source.url) {
-    raw = await fetchJsonFromUrl(source.url);
+    try {
+      // protect external fetch with a timeout to avoid hanging the request
+      const fetchPromise = fetchJsonFromUrl(source.url);
+      const timeoutMs = 15000;
+      raw = await Promise.race([
+        fetchPromise,
+        new Promise((_, rej) => setTimeout(() => rej(new Error('fetch timeout')), timeoutMs)),
+      ]);
+    } catch (err) {
+      // Log and rethrow so controller's error handler returns a 500
+      // Avoid swallowing network errors which may indicate invalid URL or network issues
+      const msg = err && (err as any).message ? (err as any).message : String(err);
+      throw new Error(`Failed to fetch spec from URL: ${msg}`);
+    }
   }
 
   const id = input.id || `spec-${(crypto as any).randomUUID ? (crypto as any).randomUUID() : Date.now().toString(36)}`;

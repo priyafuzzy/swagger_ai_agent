@@ -85,9 +85,54 @@ export async function loadFromFile(path: string): Promise<any> {
 }
 
 export async function loadFromGit(opts: { repo: string; ref?: string; filePath: string }): Promise<any> {
-  // Stub: implement git clone and read file in the future.
-  // For now, throw a not-implemented error to surface to callers.
-  throw new Error('loadFromGit not implemented');
+  // Support simple GitHub repo references by fetching the raw file from
+  // raw.githubusercontent.com. `opts.repo` may be either a "owner/repo"
+  // string or a github.com URL. We try the supplied ref, then fall back
+  // to common default branches ('main', 'master').
+  const repo = opts.repo || '';
+  const filePath = opts.filePath;
+  const tryRefs = [] as string[];
+  if (opts.ref) tryRefs.push(opts.ref);
+  tryRefs.push('main', 'master');
+
+  // normalize repo input to owner/repo
+  let ownerRepo = repo;
+  try {
+    if (repo.includes('github.com')) {
+      // strip protocol and domain, get path segments
+      const url = new URL(repo);
+      ownerRepo = url.pathname.replace(/(^\/+|\.git$)/g, '').replace(/\/$/, '');
+      // remove leading slash
+      if (ownerRepo.startsWith('/')) ownerRepo = ownerRepo.slice(1);
+    }
+    // strip .git suffix if present and any trailing slashes
+    ownerRepo = ownerRepo.replace(/\.git$/i, '').replace(/\/$/, '');
+  } catch (err) {
+    // fallback: keep original repo string
+    ownerRepo = repo;
+  }
+
+  // ensure owner/repo format
+  if (!ownerRepo || ownerRepo.split('/').length < 2) {
+    throw new Error('Invalid repo format for loadFromGit, expected "owner/repo" or full GitHub URL');
+  }
+
+  // attempt to fetch the raw file for each candidate ref
+  let lastErr: any = null;
+  for (const ref of tryRefs) {
+    const rawUrl = `https://raw.githubusercontent.com/${ownerRepo}/${ref}/${filePath}`;
+    try {
+      // call via exported symbol so tests can spy/mock it
+      const loader: any = (exports as any);
+      const res = await loader.fetchJsonFromUrl ? await loader.fetchJsonFromUrl(rawUrl) : await fetchJsonFromUrl(rawUrl);
+      return res;
+    } catch (err) {
+      lastErr = err;
+      // try next ref
+    }
+  }
+
+  throw new Error(`Failed to load file from git for ${ownerRepo}/${filePath}: ${lastErr && lastErr.message ? lastErr.message : lastErr}`);
 }
 
 export default { fetchJsonFromUrl, loadFromFile, loadFromGit };

@@ -25,16 +25,25 @@ export class OpenAIAdapter implements MCPAdapter {
       ...params,
     };
 
-    const res = await axios.post(url, body, {
-      headers: {
-        Authorization: `Bearer ${this.opts.apiKey}`,
-        'Content-Type': 'application/json',
-      },
-    });
+    try {
+      const res = await axios.post(url, body, {
+        headers: {
+          Authorization: `Bearer ${this.opts.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        timeout: 15000,
+      });
 
-    const choice = res.data?.choices?.[0];
-    const text = choice?.message?.content ?? String(res.data);
-    return { text, raw: res.data };
+      const choice = res.data?.choices?.[0];
+      const text = choice?.message?.content ?? String(res.data);
+      return { text, raw: res.data };
+    } catch (err: any) {
+      // Normalize error to be informative for callers
+      const status = err?.response?.status;
+      const body = err?.response?.data;
+      const msg = status ? `OpenAI request failed ${status}: ${JSON.stringify(body)}` : String(err?.message || err);
+      throw new Error(msg);
+    }
   }
 }
 

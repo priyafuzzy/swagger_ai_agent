@@ -19,8 +19,8 @@ export async function planRunHandler(req: Request, res: Response, next: NextFunc
 
 export async function runHandler(req: Request, res: Response, next: NextFunction) {
   try {
-    const { runId, specId, envName, selection } = req.body;
-    const report = await executeRun({ runId, specId, envName, selection });
+    const { runId, specId, envName, selection, options } = req.body;
+    const report = await executeRun({ runId, specId, envName, selection, options });
     res.json(report);
   } catch (err) {
     next(err);
